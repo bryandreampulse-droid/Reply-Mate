@@ -1029,58 +1029,60 @@ async function generate() {
   btn.disabled = true;
   btnText.innerHTML = '<div class="loader"><span></span><span></span><span></span></div> Writing your reply...';
   outputBox.classList.remove('visible');
+  outputText.textContent = '';
 
-  const bizMap = { restaurant:'restaurant', salon:'hair salon or barbershop', gym:'gym or fitness center', cafe:'café' };
-  const toneMap = { professional:'polished and professional', warm:'warm, friendly and personal', apologetic:'sincerely apologetic and empathetic', confident:'confident and positive' };
+  await new Promise(r => setTimeout(r, 1400));
 
-  const prompt = `You are a customer service expert for a ${bizMap[state.biz]}.
+  const reply = generateSmartReply(
+    review,
+    typeof state !== 'undefined' ? state.biz : 'restaurant',
+    typeof state !== 'undefined' ? state.tone : 'professional'
+  );
 
-A customer left this review: "${review}"
+  outputText.textContent = '';
+  outputBox.classList.add('visible');
 
-Write a ${toneMap[state.tone]} reply from the business owner.
-Rules:
-- 2-4 sentences only
-- Address what the customer specifically said
-- Sound genuinely human, not like a template
-- End with a warm invitation to return or contact you
-- NO placeholder text like [Name] or [Phone Number]
-- Write ONLY the reply, nothing else`;
-
-  try {
-    const res = await fetch('https://api.anthropic.com/v1/messages', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        model: 'claude-sonnet-4-20250514',
-        max_tokens: 1000,
-        messages: [{ role: 'user', content: prompt }]
-      })
-    });
-    const data = await res.json();
-    if (data.content?.[0]?.text) {
-      outputText.textContent = data.content[0].text;
-      outputBox.classList.add('visible');
-      document.getElementById('copyBtn').textContent = 'Copy Reply';
-      document.getElementById('copyBtn').classList.remove('copied');
+  let i = 0;
+  const t = setInterval(() => {
+    if (i < reply.length) {
+      outputText.textContent += reply[i++];
     } else {
-      throw new Error('No content');
+      clearInterval(t);
+      btn.disabled = false;
+      btnText.textContent = '✦ Generate Another Reply';
     }
-  } catch(e) {
-    outputText.textContent = 'Something went wrong. Please try again.';
-    outputBox.classList.add('visible');
-  }
-
-  btn.disabled = false;
-  btnText.textContent = '✦ Generate Another Reply';
+  }, 16);
 }
 
-function copyText() {
-  navigator.clipboard.writeText(document.getElementById('outputText').textContent).then(() => {
-    const b = document.getElementById('copyBtn');
-    b.textContent = '✓ Copied!';
-    b.classList.add('copied');
-    setTimeout(() => { b.textContent = 'Copy Reply'; b.classList.remove('copied'); }, 2000);
-  });
+function generateSmartReply(review, biz, tone) {
+  const r = review.toLowerCase();
+  const hasWait = r.includes('wait') || r.includes('slow') || r.includes('long');
+  const hasStaff = r.includes('rude') || r.includes('staff') || r.includes('server');
+  const hasFood = r.includes('food') || r.includes('cold') || r.includes('taste');
+  const isPos = ['great','love','amazing','best','fantastic','excellent','wonderful'].some(w=>r.includes(w));
+
+  if (isPos) {
+    if (tone==='warm') return `Oh wow, thank you so much for this! 😊 Your kind words honestly made our whole team smile. We pour our hearts into what we do, and knowing it shows means everything. Can't wait to see you again!`;
+    if (tone==='confident') return `Thank you! This is exactly the experience we deliver every day. Guests like you make it all worthwhile. See you next time! ⭐`;
+    return `Thank you so much for your wonderful review! It means a great deal to our entire team. We look forward to welcoming you back very soon! 🌟`;
+  }
+
+  let open = tone==='apologetic' ? `We are truly and deeply sorry for your experience.`
+    : tone==='warm' ? `This is really hard to read, and we completely understand your frustration.`
+    : tone==='confident' ? `Thank you for your honest feedback — we take this seriously.`
+    : `Thank you for sharing your experience. We sincerely apologize that we fell short.`;
+
+  let mid = '';
+  if (hasWait) mid += ` The wait time you experienced is unacceptable and not the standard we hold ourselves to.`;
+  if (hasStaff) mid += ` The behavior you described from our team is something we will address immediately.`;
+  if (hasFood) mid += ` Every dish should meet our quality standards, and clearly we failed you here.`;
+  if (!mid) mid = ` What you described is not the standard we hold ourselves to, and we take full responsibility.`;
+
+  const close = tone==='warm' ? ` Please give us one more chance — we genuinely want to make it up to you. 💛`
+    : tone==='confident' ? ` We will address this directly and would love to have you back. ✅`
+    : ` Please reach out to us directly — we would love the opportunity to make this right. 🙏`;
+
+  return open + mid + close;
 }
 
 // ── PLAN MODALS ───────────────────────────────────────────────
