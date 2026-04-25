@@ -1013,6 +1013,57 @@ function setChip(el, group, val) {
   state[group] = val;
 }
 
+function generateSmartReply(review, biz, tone) {
+  const r = review.toLowerCase();
+
+  // Detect issues
+  const hasWait    = r.includes('wait') || r.includes('slow') || r.includes('long') || r.includes('hour') || r.includes('minute');
+  const hasStaff   = r.includes('rude') || r.includes('staff') || r.includes('server') || r.includes('waiter') || r.includes('employee') || r.includes('unprofessional');
+  const hasFood    = r.includes('food') || r.includes('cold') || r.includes('taste') || r.includes('flavour') || r.includes('flavor') || r.includes('meal') || r.includes('dish') || r.includes('pizza') || r.includes('burger');
+  const hasPrice   = r.includes('price') || r.includes('expensive') || r.includes('overpriced') || r.includes('cost') || r.includes('cheap') || r.includes('money');
+  const hasClean   = r.includes('dirty') || r.includes('clean') || r.includes('hygiene') || r.includes('mess') || r.includes('gross');
+  const isPos      = ['great','love','amazing','best','fantastic','excellent','wonderful','perfect','delicious','friendly','awesome','superb','outstanding','brilliant','enjoyed','recommend'].some(w => r.includes(w));
+  const isNeg      = ['bad','terrible','awful','worst','disgusting','horrible','never','disappointed','unacceptable','awful','pathetic','rubbish','useless','shocking'].some(w => r.includes(w));
+
+  const bizLabel = { restaurant:'restaurant', salon:'salon', gym:'gym', cafe:'café' }[biz] || 'business';
+
+  // ── POSITIVE REVIEW ──
+  if (isPos && !isNeg) {
+    const pos = {
+      professional: `Thank you so much for your wonderful review! It truly means a great deal to our entire team at our ${bizLabel}. We work hard every day to deliver an exceptional experience, and hearing that we succeeded with you is the best reward we could ask for. We look forward to welcoming you back very soon! 🌟`,
+      warm:         `Oh wow, this absolutely made our day! 😊 Thank you so much for taking the time to share this — your kind words mean the world to every single person on our team. We genuinely love what we do, and guests like you remind us exactly why. Can't wait to see you again!`,
+      apologetic:   `We are so incredibly grateful for your generous feedback! It means more than you know. Thank you for taking the time to share your experience — this is exactly what motivates our team to keep doing what we do. We hope to see you again very soon! 🙏`,
+      confident:    `Thank you — this is exactly the standard we hold ourselves to every single day! We're proud of the experience we deliver, and it's incredibly rewarding to hear it landed that way. Guests like you make it all worthwhile. See you next time! ⭐`
+    };
+    return pos[tone] || pos.professional;
+  }
+
+  // ── NEGATIVE REVIEW ──
+  const open = {
+    professional: `Thank you for taking the time to share your feedback. We sincerely apologize that your experience at our ${bizLabel} did not meet the standard we hold ourselves to.`,
+    warm:         `We are really sorry to read this, and we completely understand your frustration. This is not the experience we ever want anyone to have at our ${bizLabel}.`,
+    apologetic:   `We are truly and deeply sorry for the experience you had. Please know that this is taken extremely seriously by our entire team and does not reflect who we are as a ${bizLabel}.`,
+    confident:    `Thank you for your honest feedback — we take every review seriously and this one is no exception. What you described is not the standard we hold ourselves to.`
+  };
+
+  let middle = '';
+  if (hasWait)  middle += ` The wait time you experienced is completely unacceptable and we are looking into this immediately.`;
+  if (hasStaff) middle += ` The behavior you described from our team member is something we will address directly and without delay.`;
+  if (hasFood)  middle += ` Every item that leaves our kitchen must meet our quality standards — clearly we failed you on this visit and we are sorry.`;
+  if (hasPrice) middle += ` Your concern about pricing is completely valid and we appreciate you flagging it to us.`;
+  if (hasClean) middle += ` Cleanliness and hygiene are non-negotiable for us — we are deeply sorry this was not your experience.`;
+  if (!middle)  middle = ` What you described falls far below the experience we strive to deliver, and we take full responsibility for that.`;
+
+  const close = {
+    professional: ` We would sincerely welcome the opportunity to make this right. Please feel free to contact us directly and we will personally ensure your next visit is everything it should be.`,
+    warm:         ` Please give us one more chance — we genuinely want to make it up to you, and we promise to do better. 💛`,
+    apologetic:   ` We would love the chance to make this right for you. Please reach out to us directly — your satisfaction means everything to us. 🙏`,
+    confident:    ` We will address this head-on and would love to have you back so we can show you the experience you truly deserved. ✅`
+  };
+
+  return (open[tone] || open.professional) + middle + (close[tone] || close.professional);
+}
+
 async function generate() {
   const review = document.getElementById('reviewInput').value.trim();
   const btn = document.getElementById('genBtn');
@@ -1031,58 +1082,38 @@ async function generate() {
   outputBox.classList.remove('visible');
   outputText.textContent = '';
 
-  await new Promise(r => setTimeout(r, 1400));
+  // Natural thinking delay
+  await new Promise(r => setTimeout(r, 1000 + Math.random() * 700));
 
-  const reply = generateSmartReply(
-    review,
-    typeof state !== 'undefined' ? state.biz : 'restaurant',
-    typeof state !== 'undefined' ? state.tone : 'professional'
-  );
+  const biz  = (typeof state !== 'undefined') ? state.biz  : 'restaurant';
+  const tone = (typeof state !== 'undefined') ? state.tone : 'professional';
+  const reply = generateSmartReply(review, biz, tone);
 
-  outputText.textContent = '';
   outputBox.classList.add('visible');
 
+  // Typewriter effect
   let i = 0;
-  const t = setInterval(() => {
+  outputText.textContent = '';
+  const ticker = setInterval(() => {
     if (i < reply.length) {
       outputText.textContent += reply[i++];
     } else {
-      clearInterval(t);
+      clearInterval(ticker);
       btn.disabled = false;
       btnText.textContent = '✦ Generate Another Reply';
+      const cb = document.getElementById('copyBtn');
+      if (cb) { cb.textContent = 'Copy Reply'; cb.classList.remove('copied'); }
     }
-  }, 16);
+  }, 14);
 }
 
-function generateSmartReply(review, biz, tone) {
-  const r = review.toLowerCase();
-  const hasWait = r.includes('wait') || r.includes('slow') || r.includes('long');
-  const hasStaff = r.includes('rude') || r.includes('staff') || r.includes('server');
-  const hasFood = r.includes('food') || r.includes('cold') || r.includes('taste');
-  const isPos = ['great','love','amazing','best','fantastic','excellent','wonderful'].some(w=>r.includes(w));
-
-  if (isPos) {
-    if (tone==='warm') return `Oh wow, thank you so much for this! 😊 Your kind words honestly made our whole team smile. We pour our hearts into what we do, and knowing it shows means everything. Can't wait to see you again!`;
-    if (tone==='confident') return `Thank you! This is exactly the experience we deliver every day. Guests like you make it all worthwhile. See you next time! ⭐`;
-    return `Thank you so much for your wonderful review! It means a great deal to our entire team. We look forward to welcoming you back very soon! 🌟`;
-  }
-
-  let open = tone==='apologetic' ? `We are truly and deeply sorry for your experience.`
-    : tone==='warm' ? `This is really hard to read, and we completely understand your frustration.`
-    : tone==='confident' ? `Thank you for your honest feedback — we take this seriously.`
-    : `Thank you for sharing your experience. We sincerely apologize that we fell short.`;
-
-  let mid = '';
-  if (hasWait) mid += ` The wait time you experienced is unacceptable and not the standard we hold ourselves to.`;
-  if (hasStaff) mid += ` The behavior you described from our team is something we will address immediately.`;
-  if (hasFood) mid += ` Every dish should meet our quality standards, and clearly we failed you here.`;
-  if (!mid) mid = ` What you described is not the standard we hold ourselves to, and we take full responsibility.`;
-
-  const close = tone==='warm' ? ` Please give us one more chance — we genuinely want to make it up to you. 💛`
-    : tone==='confident' ? ` We will address this directly and would love to have you back. ✅`
-    : ` Please reach out to us directly — we would love the opportunity to make this right. 🙏`;
-
-  return open + mid + close;
+function copyText() {
+  navigator.clipboard.writeText(document.getElementById('outputText').textContent).then(() => {
+    const b = document.getElementById('copyBtn');
+    b.textContent = '✓ Copied!';
+    b.classList.add('copied');
+    setTimeout(() => { b.textContent = 'Copy Reply'; b.classList.remove('copied'); }, 2000);
+  });
 }
 
 // ── PLAN MODALS ───────────────────────────────────────────────
